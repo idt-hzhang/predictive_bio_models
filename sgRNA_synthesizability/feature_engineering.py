@@ -10,11 +10,12 @@ from pathlib import Path
 import pandas as pd
 
 
-TOKEN_PATTERN = re.compile(r"/[^/]+/|[mr][ACGUT]|[ACGUT]|\*")
+TOKEN_PATTERN = re.compile(r"/[^/]+/|\+[ACGUT]|[mr][ACGUT]|[ACGUT]|\*")
 BASES = ("A", "C", "G", "U", "T")
 RNA_TOKENS = tuple(f"r{base}" for base in "ACGU")
 METHYL_TOKENS = tuple(f"m{base}" for base in "ACGU")
-CHEMISTRY_TOKENS = RNA_TOKENS + METHYL_TOKENS
+LNA_TOKENS = tuple(f"l{base}" for base in "ACGUT")
+CHEMISTRY_TOKENS = RNA_TOKENS + METHYL_TOKENS + LNA_TOKENS
 WORK_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = WORK_DIR / "data" / "cleaned_data.csv"
 DEFAULT_OUTPUT_DIR = WORK_DIR / "analysis" / "features"
@@ -39,13 +40,16 @@ def parse_decorated_sequence(sequence: str) -> ParsedSequence:
     consumed = [False] * len(sequence)
 
     for match in TOKEN_PATTERN.finditer(sequence):
-        token = match.group(0)
+        raw_token = match.group(0)
+        token = f"l{raw_token[1]}" if raw_token.startswith("+") else raw_token
         tokens.append(token)
         for index in range(match.start(), match.end()):
             consumed[index] = True
 
         if token in BASES:
             bases.append("U" if token == "T" else token)
+        elif len(token) == 2 and token[0] == "l" and token[1] in "ACGUT":
+            bases.append("U" if token[1] == "T" else token[1])
         elif len(token) == 2 and token[0] in {"m", "r"} and token[1] in "ACGUT":
             bases.append("U" if token[1] == "T" else token[1])
 
@@ -185,16 +189,18 @@ def sequence_features(sequence: str) -> dict[str, int | float]:
     base_counts = Counter(bases)
     token_length = len(tokens)
     base_length = len(bases)
-    modification_flags = [int(token.startswith("m") or token.startswith("/") or token == "*") for token in tokens]
+    modification_flags = [int(token.startswith(("m", "l", "/")) or token == "*") for token in tokens]
     mod_5p, mod_middle, mod_3p = window_values(modification_flags)
     star_positions = [index for index, token in enumerate(tokens) if token == "*"]
     slash_mod_positions = [index for index, token in enumerate(tokens) if token.startswith("/")]
     methyl_positions = [index for index, token in enumerate(tokens) if token.startswith("m")]
+    lna_positions = [index for index, token in enumerate(tokens) if token.startswith("l")]
     rna_positions = [index for index, token in enumerate(tokens) if token.startswith("r")]
     modified_positions = [index for index, is_modified in enumerate(modification_flags) if is_modified]
     star_flags = [token == "*" for token in tokens]
     slash_mod_flags = [token.startswith("/") for token in tokens]
     methyl_flags = [token.startswith("m") for token in tokens]
+    lna_flags = [token.startswith("l") for token in tokens]
     rna_flags = [token.startswith("r") for token in tokens]
     modified_flags = [bool(is_modified) for is_modified in modification_flags]
 
@@ -226,6 +232,7 @@ def sequence_features(sequence: str) -> dict[str, int | float]:
         "longest_star_run": longest_flag_run(star_flags),
         "longest_slash_mod_run": longest_flag_run(slash_mod_flags),
         "longest_methyl_run": longest_flag_run(methyl_flags),
+        "longest_lna_run": longest_flag_run(lna_flags),
         "longest_rna_run": longest_flag_run(rna_flags),
         "longest_modified_token_run": longest_flag_run(modified_flags),
     }
@@ -244,6 +251,7 @@ def sequence_features(sequence: str) -> dict[str, int | float]:
     add_position_features(features, "star", star_positions, token_length)
     add_position_features(features, "slash_mod", slash_mod_positions, token_length)
     add_position_features(features, "methyl", methyl_positions, token_length)
+    add_position_features(features, "lna", lna_positions, token_length)
     add_position_features(features, "rna", rna_positions, token_length)
     add_position_features(features, "modified_token", modified_positions, token_length)
 

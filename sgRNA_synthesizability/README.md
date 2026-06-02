@@ -15,36 +15,36 @@ The modeling workflow treats `Fail` as the positive class. Because failures are 
 
 ## Feature Summary
 
-The current model matrix has 131 numeric features generated from the decorated `Sequence` field. The persisted feature matrix also includes an `id` column from `Ref ID` for linkage back to the raw data, but `id` is not used as a model feature.
+The current model matrix has 161 numeric features generated from the decorated `Sequence` field. The parser treats `+A`, `+C`, `+G`, `+U`, and `+T` as LNA nucleotides and normalizes them internally to `lA`, `lC`, `lG`, `lU`, and `lT`. The persisted feature matrix also includes an `id` column from `Ref ID` for linkage back to the raw data, but `id` is not used as a model feature.
 
 | Feature family | How it is calculated | Relationship with failure target |
 | --- | --- | --- |
-| Parsing completeness | Counts and fractions of decorated-sequence characters not consumed by the parser. | The strongest univariate signal is parser-unrecognized content: `unknown_char_count` and `unknown_char_fraction` have Mann-Whitney p-values near `4.90e-10`, positive mean differences in failures, and Cohen's d near 1.05. |
+| Parsing completeness | Counts and fractions of decorated-sequence characters not consumed by the parser. | After interpreting `+` as LNA notation, the known `+` examples are no longer counted as unknown characters. Unknown-character features remain as data-quality guards for genuinely unsupported syntax. |
 | Sequence size and base composition | Decorated string length, parsed token length, undecorated base length, A/C/G/U/T-equivalent counts and fractions, GC/AU, purine/pyrimidine fractions, terminal GC count, and maximum GC fraction in 10-base windows. | Composition features are important in the random-forest ranking. `base_U_fraction`, `base_T_fraction`, `base_G_fraction`, `base_C_fraction`, and `pyrimidine_fraction` are among the higher-importance model features. |
-| Motif and run structure | Longest homopolymer run, longest GC run, repeated dinucleotide count, and longest consecutive runs for chemistry token families and individual `rA`, `rC`, `rG`, `rU`, `mA`, `mC`, `mG`, and `mU` tokens. | Run and repeat features show meaningful signal. `longest_rU_run`, `longest_homopolymer_run`, `longest_rA_run`, and `repeated_dinucleotide_count` are among the top univariate features; repeated dinucleotides are also the top random-forest importance feature. |
-| Modification burden | Counts, densities, and terminal counts for slash-delimited modifications, phosphorothioate `*` markers, methyl tokens, RNA tokens, and all modified tokens. | Global modification burden is weaker than positional information, but `star_density`, `slash_mod_count`, and unknown-character burden are useful enough to support a simple rule baseline. |
-| Positional modification features | For `star`, `slash_mod`, `methyl`, `rna`, and `modified_token` families, the parser records first, last, mean, standard deviation, relative fractions, span, counts in 5-prime/middle/3-prime thirds, and window densities. | Position-aware features are repeatedly selected by both tests and model importance. `rna_mean_fraction`, `rna_mean_position`, `rna_count_3p`, `methyl_mean_fraction`, `modified_token_mean_fraction`, `star_position_std`, and `modified_token_position_std` are notable signals. |
+| Motif and run structure | Longest homopolymer run, longest GC run, repeated dinucleotide count, and longest consecutive runs for chemistry token families and individual `rA`, `rC`, `rG`, `rU`, `mA`, `mC`, `mG`, `mU`, `lA`, `lC`, `lG`, `lU`, and `lT` tokens. | Run and repeat features show meaningful signal. LNA run features dominate the top univariate rankings, while repeated dinucleotides remain among the strongest random-forest importance features. |
+| Modification burden | Counts, densities, and terminal counts for slash-delimited modifications, phosphorothioate `*` markers, methyl tokens, LNA tokens, RNA tokens, and all modified tokens. | LNA count and fraction features are the strongest univariate signals after correcting `+` parsing, especially `token_lT_count`, `token_lA_count`, `token_lA_fraction`, and `token_lT_fraction`. |
+| Positional modification features | For `star`, `slash_mod`, `methyl`, `lna`, `rna`, and `modified_token` families, the parser records first, last, mean, standard deviation, relative fractions, span, counts in 5-prime/middle/3-prime thirds, and window densities. | Position-aware features are repeatedly selected by both tests and model importance. LNA middle-window count/density and LNA positional spread are strong univariate signals, while `star_position_std`, `rna_position_std`, and `modified_token_position_std` are important to tree models. |
 
 Top statistically ranked features from `analysis/modeling_outputs/feature_rankings.csv`:
 
 | Feature | Mann-Whitney p | Rank-biserial | Fail - Pass mean difference | Cohen's d | RF importance |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `unknown_char_count` | 4.896e-10 | 0.0439 | 0.5003 | 1.0480 | 0.0004 |
-| `unknown_char_fraction` | 4.896e-10 | 0.0439 | 0.0019 | 1.0500 | 0.0006 |
-| `longest_rU_run` | 1.277e-04 | -0.2028 | -0.2716 | -0.3265 | 0.0110 |
-| `rna_mean_fraction` | 7.229e-04 | -0.2088 | -0.0093 | -0.1825 | 0.0180 |
-| `rna_count_3p` | 3.032e-03 | -0.1825 | -2.2960 | -0.1860 | 0.0134 |
-| `repeated_dinucleotide_count` | 3.514e-03 | -0.1822 | -0.6506 | -0.0574 | 0.0274 |
-| `longest_homopolymer_run` | 3.758e-03 | -0.1533 | -0.2087 | -0.0995 | 0.0031 |
-| `longest_rA_run` | 4.637e-03 | -0.1640 | -0.2568 | -0.1142 | 0.0038 |
-| `methyl_mean_fraction` | 7.274e-03 | 0.1659 | 0.0386 | 0.0766 | 0.0078 |
-| `rna_mean_position` | 1.096e-02 | -0.1582 | -1.9480 | -0.1620 | 0.0161 |
+| `token_lT_count` | 7.553e-14 | 0.0450 | 0.1833 | 1.0957 | 0.0000 |
+| `token_lA_count` | 7.553e-14 | 0.0450 | 0.1717 | 1.0756 | 0.0000 |
+| `token_lA_fraction` | 7.554e-14 | 0.0450 | 0.0014 | 1.0773 | 0.0000 |
+| `token_lT_fraction` | 7.554e-14 | 0.0450 | 0.0015 | 1.1012 | 0.0000 |
+| `longest_lT_run` | 7.729e-14 | 0.0450 | 0.0798 | 1.0129 | 0.0000 |
+| `longest_lA_run` | 8.279e-14 | 0.0449 | 0.0449 | 0.8272 | 0.0000 |
+| `longest_lC_run` | 8.210e-13 | 0.0341 | 0.0337 | 0.6171 | 0.0000 |
+| `token_lC_count` | 8.384e-13 | 0.0341 | 0.0329 | 0.4248 | 0.0000 |
+| `token_lC_fraction` | 8.384e-13 | 0.0341 | 0.0003 | 0.4579 | 0.0000 |
+| `token_lG_fraction` | 2.770e-12 | 0.0446 | 0.0009 | 0.8487 | 0.0000 |
 
-The random-forest importance ranking emphasizes repeated dinucleotides, positional spread of `*` and modified tokens, base composition, and RNA-token position/fraction features. The top five random-forest features are `repeated_dinucleotide_count`, `star_position_std`, `base_U_fraction`, `token_rC_fraction`, and `base_T_fraction`.
+The random-forest importance ranking emphasizes positional spread of `*`, repeated dinucleotides, base composition, and RNA-token position/fraction features. The top five random-forest features are `star_position_std`, `repeated_dinucleotide_count`, `base_U_fraction`, `base_G_fraction`, and `base_T_fraction`.
 
 ## Model Summary
 
-Models were evaluated with 5-fold stratified grouped cross-validation, using the decorated `Sequence` as the grouping variable to reduce sequence-level leakage. All learned models used the 131 engineered numeric features except `elastic_net_logistic_with_char_ngrams`, which combined the engineered features with character n-gram TF-IDF features from the decorated sequence.
+Models were evaluated with 5-fold stratified grouped cross-validation, using the decorated `Sequence` as the grouping variable to reduce sequence-level leakage. All learned models used the 161 engineered numeric features except `elastic_net_logistic_with_char_ngrams`, which combined the engineered features with character n-gram TF-IDF features from the decorated sequence.
 
 | Model | Type and inputs | Notes |
 | --- | --- | --- |
@@ -64,26 +64,26 @@ Overall out-of-fold metrics from `analysis/modeling_outputs/cv_metrics.csv`:
 
 | Model | Average precision | ROC AUC | Brier score | Recall at precision 25% | Recall at precision 50% | Precision top 5% | Precision top 10% | Confusion matrix at 0.5 threshold (TN/FP/FN/TP) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `hist_gradient_boosting` | 0.1119 | 0.6345 | 0.0317 | 0.1279 | 0.0349 | 0.1353 | 0.0868 | 2550 / 10 / 81 / 5 |
-| `lightgbm_balanced` | 0.1076 | 0.6232 | 0.0862 | 0.2209 | 0.0000 | 0.1579 | 0.0943 | 2315 / 245 / 61 / 25 |
-| `balanced_random_forest` | 0.0924 | 0.6245 | 0.1082 | 0.0116 | 0.0116 | 0.1654 | 0.0943 | 2465 / 95 / 65 / 21 |
-| `elastic_net_logistic_with_char_ngrams` | 0.0875 | 0.5952 | 0.1926 | 0.1163 | 0.0000 | 0.1278 | 0.0943 | 2027 / 533 / 51 / 35 |
-| `xgboost_weighted` | 0.0870 | 0.6159 | 0.1244 | 0.0116 | 0.0116 | 0.1504 | 0.0906 | 2176 / 384 / 57 / 29 |
-| `rule_baseline` | 0.0870 | 0.4891 | 0.0837 | 0.0581 | 0.0581 | 0.0526 | 0.0453 | 2553 / 7 / 81 / 5 |
-| `logistic_l2_balanced` | 0.0699 | 0.5883 | 0.1884 | 0.1047 | 0.0000 | 0.1128 | 0.0792 | 1908 / 652 / 53 / 33 |
-| `logistic_l1_balanced` | 0.0696 | 0.5924 | 0.1885 | 0.0930 | 0.0000 | 0.1203 | 0.0792 | 1865 / 695 / 52 / 34 |
-| `elastic_net_logistic` | 0.0679 | 0.5815 | 0.1993 | 0.0000 | 0.0000 | 0.1128 | 0.0755 | 1829 / 731 / 52 / 34 |
+| `hist_gradient_boosting` | 0.1087 | 0.6304 | 0.0319 | 0.0698 | 0.0581 | 0.1278 | 0.0906 | 2549 / 11 / 80 / 6 |
+| `lightgbm_balanced` | 0.1030 | 0.6172 | 0.0871 | 0.1628 | 0.0349 | 0.1429 | 0.0868 | 2320 / 240 / 63 / 23 |
+| `xgboost_weighted` | 0.0907 | 0.6238 | 0.1232 | 0.1744 | 0.0116 | 0.1504 | 0.0868 | 2174 / 386 / 58 / 28 |
+| `balanced_random_forest` | 0.0848 | 0.6230 | 0.1095 | 0.0233 | 0.0000 | 0.1654 | 0.0943 | 2464 / 96 / 65 / 21 |
+| `logistic_l2_balanced` | 0.0767 | 0.5930 | 0.1874 | 0.1047 | 0.0000 | 0.1128 | 0.0717 | 1896 / 664 / 52 / 34 |
+| `elastic_net_logistic_with_char_ngrams` | 0.0762 | 0.5833 | 0.1979 | 0.0814 | 0.0000 | 0.1203 | 0.0906 | 1982 / 578 / 51 / 35 |
+| `elastic_net_logistic` | 0.0740 | 0.5907 | 0.1877 | 0.1047 | 0.0000 | 0.1128 | 0.0792 | 1899 / 661 / 51 / 35 |
+| `logistic_l1_balanced` | 0.0702 | 0.5925 | 0.1868 | 0.0930 | 0.0000 | 0.1128 | 0.0755 | 1870 / 690 / 52 / 34 |
+| `rule_baseline` | 0.0402 | 0.4989 | 0.1601 | 0.0116 | 0.0116 | 0.0602 | 0.0377 | 2441 / 119 / 79 / 7 |
 | `prevalence_baseline` | 0.0322 | 0.4953 | 0.0314 | 0.0000 | 0.0000 | 0.0602 | 0.0377 | 2560 / 0 / 86 / 0 |
-| `linear_svm_rbf_calibrated_probability` | 0.0283 | 0.4061 | 0.0316 | 0.0000 | 0.0000 | 0.0301 | 0.0415 | 2560 / 0 / 86 / 0 |
+| `linear_svm_rbf_calibrated_probability` | 0.0282 | 0.4110 | 0.0316 | 0.0000 | 0.0000 | 0.0301 | 0.0377 | 2560 / 0 / 86 / 0 |
 
-The current selected model is `hist_gradient_boosting`, chosen by highest out-of-fold average precision among trained model candidates. Its average precision is about 3.5 times the empirical failure prevalence baseline, and its top 5% risk bin has 13.5% failures versus a 3.2% overall failure rate. `lightgbm_balanced` and `balanced_random_forest` are also useful candidate models for triage-oriented workflows because they provide higher top-bin failure enrichment and, for LightGBM, higher recall at 25% precision.
+The current selected model is `hist_gradient_boosting`, chosen by highest out-of-fold average precision among trained model candidates. Its average precision is about 3.4 times the empirical failure prevalence baseline, and its top 5% risk bin has 12.8% failures versus a 3.2% overall failure rate. `lightgbm_balanced`, `xgboost_weighted`, and `balanced_random_forest` are also useful candidate models for triage-oriented workflows because they provide competitive top-bin enrichment and, for LightGBM/XGBoost, higher recall at 25% precision.
 
 ## Key Findings
 
 - The dataset is highly imbalanced: only 86 of 2,646 binary labeled samples are failures. Metrics that focus on ranking and positive-class discovery are more informative than accuracy.
-- The best current model is `hist_gradient_boosting`, with out-of-fold average precision 0.1119, ROC AUC 0.6345, Brier score 0.0317, and 13.5% failure precision in the top 5% highest-risk samples.
-- The strongest single-feature statistical signal is parser-unrecognized sequence content. Failures have higher `unknown_char_count` and `unknown_char_fraction`, suggesting that unusual decoration syntax or chemistry tokens may mark synthesis risk or data irregularity worth reviewing.
-- Positional chemistry features add useful signal. RNA-token position, 3-prime RNA counts, methyl-token mean position, modified-token mean position, and positional spread of `*` and modified tokens appear in the statistical or model-importance rankings.
-- Run and motif features matter. `longest_rU_run`, `longest_rA_run`, `longest_homopolymer_run`, and `repeated_dinucleotide_count` are associated with the target, and repeated dinucleotide count is the highest random-forest importance feature.
+- The best current model is `hist_gradient_boosting`, with out-of-fold average precision 0.1087, ROC AUC 0.6304, Brier score 0.0319, and 12.8% failure precision in the top 5% highest-risk samples.
+- The strongest single-feature statistical signals are LNA features derived from `+` notation. Failures have higher LNA A/T counts and fractions, and LNA middle-window features are prominent in the univariate rankings.
+- Positional chemistry features add useful signal. LNA position/spread, RNA-token position, modified-token mean position, and positional spread of `*` and modified tokens appear in the statistical or model-importance rankings.
+- Run and motif features matter. LNA run features dominate the univariate ranking, while repeated dinucleotide count remains one of the strongest random-forest importance features.
 - Base-composition features contribute to model decisions, especially U/T-equivalent, C, G, pyrimidine, and RNA-token fractions.
 - Absolute model performance remains modest, which is expected for a small rare-event dataset. The current models are more suitable for prioritizing high-risk samples for review than for making hard pass/fail calls at a default 0.5 threshold.
