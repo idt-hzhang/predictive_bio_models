@@ -10,7 +10,9 @@ The modeling workflow treats `Fail` as the positive class. Because failures are 
 - Model training and evaluation: `train_baseline_model.py`
 - Learning-curve analysis: `../analysis/learning_curve_analysis.py`
 - Post-selection diagnostics: `../analysis/next_step_analyses.py`
+- Correlation-pruned feature-set modeling: `../analysis/correlation_reduced_modeling.py`
 - Feature matrix and target outputs: `../analysis/features/`
+- Correlation-pruned feature matrix and target outputs: `../analysis/features_correlation_reduced/`
 - Model metrics and selected model artifacts: `../analysis/modeling_outputs/`
 - Per-feature plots and statistical tests: `../analysis/feature_target_plots/`
 - Full feature definitions: `.github/feature_list.md`
@@ -94,6 +96,12 @@ Learning-curve analysis trained the selected model on 10%, 20%, 40%, 60%, 80%, a
 
 Reduced-feature models using the top 5, 10, and 20 stable features did not match the full selected model. The best reduced model was `hist_gradient_boosting_top_20`, with average precision 0.0738 and ROC AUC 0.6113, about 68% of the full model's average precision. This does not meet the planned 10-15% performance-loss criterion for preferring a simpler deployment model. The full 161-feature `hist_gradient_boosting` model remains the recommended model for risk ranking.
 
+### Correlation-Pruned Feature Set
+
+A separate redundancy-reduction analysis removed features with absolute Pearson correlation greater than 0.90, retaining the higher-priority feature from each correlated pair using the existing feature-ranking table. This reduced the engineered feature set from 161 to 71 features and dropped 90 highly correlated features. The reduced feature matrix is written to `analysis/features_correlation_reduced/`, and model results are summarized in `analysis/modeling_outputs/correlation_reduced_model_comparison.md`.
+
+The correlation-pruned feature set slightly improved the selected model: `hist_gradient_boosting` average precision increased from 0.1087 to 0.1139, ROC AUC increased from 0.6304 to 0.6529, and Precision@5% increased from 0.1278 to 0.1353. `xgboost_weighted` also improved in average precision, from 0.0907 to 0.1026. These results suggest that removing highly redundant features can modestly improve tree-based ranking performance and reduce feature-set complexity without losing useful signal.
+
 ### Risk Tiers
 
 Risk tiering converts continuous out-of-fold predictions into operational review groups:
@@ -125,6 +133,7 @@ SHAP-specific plots were not generated because the configured conda environment 
 - Learning-curve results do not show a clear full plateau: AP, ROC AUC, and Precision@5% all improve from 80% to 100% of training data. Since additional labeled failures are not expected, future work should emphasize feature interpretation, stable review rules, and better use of existing signal.
 - The high-risk tier is operationally useful: the top 5% highest-risk sequences show a 12.1% observed failure rate, or 3.73x enrichment over the 3.25% baseline.
 - Reduced-feature models are not yet competitive with the full model. The best top-20-feature HGB model retains about 68% of full-model AP, so the full engineered feature set remains preferred.
+- Correlation pruning is more promising than selecting only a small top-feature subset. Removing features with absolute correlation >0.90 reduced the feature set from 161 to 71 features and improved `hist_gradient_boosting` AP from 0.1087 to 0.1139.
 - The strongest single-feature statistical signals are LNA features derived from `+` notation. Failures have higher LNA A/T counts and fractions, and LNA middle-window features are prominent in the univariate rankings.
 - Bootstrap stability highlights a complementary set of robust model-derived features, especially repeated dinucleotide count, RNA-token fractions, base-composition fractions, purine/pyrimidine fractions, and positional spread features.
 - Positional chemistry features add useful signal. LNA position/spread, RNA-token position, modified-token mean position, and positional spread of `*` and modified tokens appear in the statistical or model-importance rankings.
