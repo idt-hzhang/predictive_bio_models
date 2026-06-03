@@ -18,6 +18,7 @@ from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
     confusion_matrix,
+    f1_score as classification_f1_score,
     precision_recall_curve,
     roc_auc_score,
 )
@@ -311,8 +312,10 @@ def evaluate_predictions(model_name: str, fold: int | str, y_true: np.ndarray, y
         "rows": int(len(y_true)),
         "failures": int(y_true.sum()),
         "average_precision": float(average_precision_score(y_true, y_score)),
+        "pr_auc": float(average_precision_score(y_true, y_score)),
         "roc_auc": safe_roc_auc(y_true, y_score),
         "brier_score": float(brier_score_loss(y_true, y_score)),
+        "f1_score": float(classification_f1_score(y_true, y_pred, zero_division=0)),
         "recall_at_precision_25": recall_at_precision(y_true, y_score, 0.25),
         "recall_at_precision_50": recall_at_precision(y_true, y_score, 0.50),
         "recall_at_precision_75": recall_at_precision(y_true, y_score, 0.75),
@@ -499,8 +502,10 @@ def write_report(
     metric_columns = [
         "model",
         "average_precision",
+        "pr_auc",
         "roc_auc",
         "brier_score",
+        "f1_score",
         "recall_at_precision_25",
         "precision_top_05",
         "precision_top_10",
@@ -576,7 +581,7 @@ def main() -> None:
     overall = metrics[metrics["fold"].eq("overall_oof")].sort_values("average_precision", ascending=False)
     print(f"binary_rows={len(binary_data)} failures={int(y.sum())} features={features.shape[1]}")
     print(f"best_model={best_model_name}")
-    print(overall[["model", "average_precision", "roc_auc", "precision_top_05"]].to_string(index=False))
+    print(overall[["model", "average_precision", "pr_auc", "roc_auc", "f1_score", "precision_top_05"]].to_string(index=False))
     print(f"saved_outputs={OUTPUT_DIR.relative_to(WORK_DIR)}")
 
 

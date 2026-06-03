@@ -365,7 +365,6 @@ Your branch is ahead of 'origin/main' by 2 commits.
   (use "git push" to publish your local commits)
 
 MODELING_PLAN.html
-analysis/
 data/
 data_formatting.py
 environment.yml

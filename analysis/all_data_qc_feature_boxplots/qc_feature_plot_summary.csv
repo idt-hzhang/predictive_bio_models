@@ -1,0 +1,14 @@
+feature,feature_type,plot_file,pass_count,fail_count,pass_mean,fail_mean,pass_median,fail_median,mean_difference_fail_minus_pass,mannwhitney_p,cohen_d
+Sample OD,numeric,analysis/all_data_qc_feature_boxplots/Sample_OD.png,2560,86,0.5259453125,0.587093023255814,0.51,0.51,0.061147710755814044,0.7934714250998878,0.17267888574093174
+Sample Volume (uL),numeric,analysis/all_data_qc_feature_boxplots/Sample_Volume__uL_.png,2560,86,50.166015625,50.872093023255815,50.0,50.0,0.7060773982558146,0.10836565621408926,0.18184124658449702
+P=S Bonds,numeric,analysis/all_data_qc_feature_boxplots/P_S_Bonds.png,2560,86,5.497265625,6.0,6.0,6.0,0.5027343750000002,0.7942419829851334,0.2021671937264283
+OMe Bases,numeric,analysis/all_data_qc_feature_boxplots/OMe_Bases.png,2560,86,11.94921875,14.267441860465116,6.0,6.0,2.318223110465116,0.14788534833023312,0.15529709844206172
+Length,numeric,analysis/all_data_qc_feature_boxplots/Length.png,2560,86,105.801953125,103.6046511627907,100.0,100.0,-2.197301962209295,0.7988730340773105,-0.10095695821807872
+UHPLC % Pre-MainPeak,numeric,analysis/all_data_qc_feature_boxplots/UHPLC___Pre-MainPeak.png,2560,84,9.091015625,19.19047619047619,8.0,13.0,10.099460565476189,2.0664597395150376e-15,1.6525765141158433
+UHPLC % MainPeak,numeric,analysis/all_data_qc_feature_boxplots/UHPLC___MainPeak.png,2560,84,76.659765625,63.29761904761905,79.0,67.0,-13.362146577380955,8.706798576125933e-16,-1.2384232240989712
+UHPLC % Post-MainPeak,numeric,analysis/all_data_qc_feature_boxplots/UHPLC___Post-MainPeak.png,2558,84,14.258405003909305,17.476190476190474,13.0,15.5,3.21778547228117,0.003097625405590374,0.48999352996402035
+ESI %,numeric,analysis/all_data_qc_feature_boxplots/ESI__.png,2555,86,95.11136986301369,92.58674418604652,97.0,92.5,-2.524625676967176,0.0002486910931229957,-0.41447124247114775
+Ship Ods,numeric,analysis/all_data_qc_feature_boxplots/Ship_Ods.png,2560,86,23.98131640625,40.81395348837209,11.0,10.0,16.832637082122094,0.7569706560684393,0.1858102203611462
+Ship Nmoles,numeric,analysis/all_data_qc_feature_boxplots/Ship_Nmoles.png,2560,86,27.631164062499998,47.127906976744185,11.0,10.0,19.496742914244187,0.7937822159318179,0.16068360439985985
+Yield Guarantee (ODs),numeric,analysis/all_data_qc_feature_boxplots/Yield_Guarantee__ODs_.png,2560,86,19.113328125000002,36.30232558139535,10.0,8.5,17.18899745639535,0.8826350938903882,0.20742972321417863
+ESI Status,categorical,analysis/all_data_qc_feature_boxplots/ESI_Status.png,2547,86,,,,,,,
