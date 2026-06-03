@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SGRnaSynthesisFailurePredictor": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
