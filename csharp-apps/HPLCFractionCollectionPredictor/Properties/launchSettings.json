@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "HPLCFractionCollectionPredictor": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

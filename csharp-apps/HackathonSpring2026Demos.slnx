@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="HPLCFractionCollectionPredictor/HPLCFractionCollectionPredictor.csproj" />
+  <Project Path="SGRnaSynthesisFailurePredictor/SGRnaSynthesisFailurePredictor.csproj" />
+</Solution>
