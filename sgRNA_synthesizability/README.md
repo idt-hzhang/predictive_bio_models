@@ -11,6 +11,9 @@ The modeling workflow treats `Fail` as the positive class. Because failures are 
 - Learning-curve analysis: `../analysis/learning_curve_analysis.py`
 - Post-selection diagnostics: `../analysis/next_step_analyses.py`
 - Correlation-pruned feature-set modeling: `../analysis/correlation_reduced_modeling.py`
+- MainPeak regression modeling: `../analysis/train_mainpeak_regression.py`
+- Reduced-feature MainPeak modeling: `../analysis/mainpeak_reduced_feature_modeling.py`
+- Fail-focused MainPeak training experiment: `../analysis/mainpeak_fail_focused_training.py`
 - Feature matrix and target outputs: `../analysis/features/`
 - Correlation-pruned feature matrix and target outputs: `../analysis/features_correlation_reduced/`
 - Model metrics and selected model artifacts: `../analysis/modeling_outputs/`
@@ -102,6 +105,39 @@ A separate redundancy-reduction analysis removed features with absolute Pearson 
 
 The correlation-pruned feature set slightly improved the selected model: `hist_gradient_boosting` average precision increased from 0.1087 to 0.1139, ROC AUC increased from 0.6304 to 0.6529, and Precision@5% increased from 0.1278 to 0.1353. `xgboost_weighted` also improved in average precision, from 0.0907 to 0.1026. These results suggest that removing highly redundant features can modestly improve tree-based ranking performance and reduce feature-set complexity without losing useful signal.
 
+### MainPeak Regression
+
+A separate continuous-outcome analysis used `data/cleaned_data.mainpeak.csv` to predict `MainPeak`, renamed from `UHPLC % MainPeak`, directly from the same 161 sequence-derived features. Rows with missing `MainPeak` were excluded, leaving 2,653 rows for 5-fold grouped cross-validation by decorated sequence. The model set now includes linear regularized regressors (`ridge`, `elastic_net`, `lasso`, `bayesian_ridge`) and tree/boosting regressors (`hist_gradient_boosting`, `gradient_boosting`, `random_forest`, `extra_trees`). Results are summarized in `analysis/modeling_outputs/mainpeak_regression_report.md`.
+
+| Model | MAE | RMSE | R2 | Pearson r | Spearman r |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `extra_trees` | 4.1672 | 6.0574 | 0.7005 | 0.8370 | 0.7750 |
+| `gradient_boosting` | 4.3078 | 6.1917 | 0.6870 | 0.8289 | 0.7602 |
+| `hist_gradient_boosting` | 4.2547 | 6.2093 | 0.6853 | 0.8281 | 0.7593 |
+| `random_forest` | 4.2684 | 6.2526 | 0.6809 | 0.8252 | 0.7638 |
+| `elastic_net` | 4.5117 | 6.5236 | 0.6526 | 0.8081 | 0.7409 |
+| `bayesian_ridge` | 4.5768 | 7.3527 | 0.5587 | 0.7599 | 0.7404 |
+| `mean_baseline` | 8.3342 | 11.0699 | -0.0003 | -0.0249 | -0.0241 |
+| `ridge` | 4.7152 | 11.8459 | -0.1455 | 0.5621 | 0.7410 |
+| `lasso` | 4.7739 | 15.6933 | -1.0104 | 0.4533 | 0.7437 |
+
+The best MainPeak model is `extra_trees`, which improves RMSE by 45.3% versus the mean baseline and explains 70.0% of out-of-fold MainPeak variance. This is stronger than the rare-event Pass/Fail classification signal because MainPeak preserves the continuous UHPLC purity measurement instead of compressing it into an imbalanced binary endpoint. The result suggests that sequence features contain substantial information about continuous chromatographic purity, even though hard failure classification remains difficult.
+
+Predicted MainPeak values were also converted into derived binary labels using the length-specific thresholds in `.github/pass_fail_labeling_rules.md`. Predicted values below the pass threshold were treated as derived `Fail` labels for comparison with the original binary `Pass/Fail` labels. The best derived classifier is `elastic_net`, with average precision 0.1069, ROC AUC 0.6217, Precision@Recall25 0.1228, Precision@Recall50 0.0423, and Precision@5% 0.1353. This is close to the original full-feature `hist_gradient_boosting` Pass/Fail model (AP 0.1087, ROC AUC 0.6304, Precision@5% 0.1278), but still below the correlation-pruned Pass/Fail `hist_gradient_boosting` model (AP 0.1139, ROC AUC 0.6529, Precision@5% 0.1353). The regression-derived classifier therefore captures some of the binary failure signal, but it does not replace the direct Pass/Fail classifier.
+
+Per-class performance for the best derived classifier shows the imbalance explicitly. `elastic_net` is strong at preserving `Pass` calls but weak at recovering known `Fail` rows under the hard MainPeak threshold rule:
+
+| Class | Support | Predicted count | Precision | Recall | Specificity | F1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `Fail` | 84 | 48 | 0.1667 | 0.0952 | 0.9844 | 0.1212 |
+| `Pass` | 2,560 | 2,596 | 0.9707 | 0.9844 | 0.0952 | 0.9775 |
+
+Reduced-feature MainPeak modeling fit feature selectors inside each grouped CV split to reduce leakage and improve interpretability. Three selectors were compared: correlation-pruned target association, mutual information, and ExtraTrees feature importance, each retaining up to 40 of the 161 sequence-derived features. The best reduced-feature model is `extra_trees` with the `extra_trees_top_40` selector, achieving MAE 4.1872, RMSE 6.0998, R2 0.6963, Pearson r 0.8345, and Spearman r 0.7710. This retains nearly all of the full-feature `extra_trees` performance (RMSE 6.0574, R2 0.7005) while using about one quarter of the original features. Class-specific MainPeak regression metrics for this reduced model are much stronger for true `Pass` rows (MAE 3.8869, RMSE 5.3894, R2 0.7391) than true `Fail` rows (MAE 12.6806, RMSE 16.3866, R2 0.0002), indicating that the model explains routine passing purity better than the lower-purity failure tail.
+
+The most stable features selected by the best reduced-feature selector include sequence-size and positional chemistry features such as `token_length`, `methyl_last_position`, `decorated_length`, `star_last_position`, `base_length`, `star_mean_position`, `rna_mean_position`, `modified_token_last_position`, and `star_position_std`. Full reduced-feature results are in `analysis/modeling_outputs/mainpeak_reduced_feature_report.md`.
+
+A fail-focused training experiment tested whether balancing the small `Fail` class improves MainPeak regression for true failures. Using the same fold-wise `extra_trees_top_40` selector, ordinary training was compared with train-fold `Fail` oversampling and `Fail` sample weighting. Balancing does help the failure tail: the best `Fail`-class model is weighted `extra_trees`, improving `Fail` RMSE from 16.3866 to 13.4955 and `Fail` R2 from 0.0002 to 0.3218. However, this comes at a clear cost: overall RMSE worsens from 6.0998 to 6.8782, overall R2 drops from 0.6963 to 0.6138, and `Pass` RMSE worsens from 5.3894 to 6.5189. Oversampling also improves failures but slightly less than weighting in this experiment. The recommendation is therefore not to use bootstrapping/oversampling as the default production model; use class weighting only if the operating goal explicitly prioritizes lower error on known failures over global MainPeak calibration, and prioritize collecting more real low-MainPeak/failure examples instead. Full results are in `analysis/modeling_outputs/mainpeak_fail_focused_training_report.md`.
+
 ### Risk Tiers
 
 Risk tiering converts continuous out-of-fold predictions into operational review groups:
@@ -134,6 +170,10 @@ SHAP-specific plots were not generated because the configured conda environment 
 - The high-risk tier is operationally useful: the top 5% highest-risk sequences show a 12.1% observed failure rate, or 3.73x enrichment over the 3.25% baseline.
 - Reduced-feature models are not yet competitive with the full model. The best top-20-feature HGB model retains about 68% of full-model AP, so the full engineered feature set remains preferred.
 - Correlation pruning is more promising than selecting only a small top-feature subset. Removing features with absolute correlation >0.90 reduced the feature set from 161 to 71 features and improved `hist_gradient_boosting` AP from 0.1087 to 0.1139.
+- MainPeak regression is substantially more predictable than binary failure status from the same sequence features. The best MainPeak `extra_trees` regressor achieves RMSE 6.06 and R2 0.700, while the best regression-derived Pass/Fail classifier reaches AP 0.1069, close to the direct full-feature HGB classifier AP 0.1087 but below the correlation-pruned HGB classifier AP 0.1139.
+- Per-class metrics for the best regression-derived classifier expose the operating tradeoff: `Pass` recall is high at 0.9844, but `Fail` recall is only 0.0952 under the hard MainPeak threshold rule, so the derived labels are not suitable as a standalone failure detector.
+- Reduced-feature MainPeak modeling is promising: an ExtraTrees-selected 40-feature model preserves nearly all full-feature performance (RMSE 6.10 and R2 0.696 versus full-feature RMSE 6.06 and R2 0.700), but class-specific regression metrics remain much worse for true `Fail` rows than true `Pass` rows.
+- Fail-focused balancing improves MainPeak regression on true `Fail` rows but degrades overall and `Pass` performance. Weighted ExtraTrees reduces `Fail` RMSE from 16.39 to 13.50, but worsens overall RMSE from 6.10 to 6.88, so balancing should be treated as an operating-point tradeoff rather than a general improvement.
 - The strongest single-feature statistical signals are LNA features derived from `+` notation. Failures have higher LNA A/T counts and fractions, and LNA middle-window features are prominent in the univariate rankings.
 - Bootstrap stability highlights a complementary set of robust model-derived features, especially repeated dinucleotide count, RNA-token fractions, base-composition fractions, purine/pyrimidine fractions, and positional spread features.
 - Positional chemistry features add useful signal. LNA position/spread, RNA-token position, modified-token mean position, and positional spread of `*` and modified tokens appear in the statistical or model-importance rankings.
