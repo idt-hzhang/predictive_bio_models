@@ -8,6 +8,8 @@ The modeling workflow treats `Fail` as the positive class. Because failures are 
 
 - Feature parser: `feature_engineering.py`
 - Model training and evaluation: `train_baseline_model.py`
+- Learning-curve analysis: `../analysis/learning_curve_analysis.py`
+- Post-selection diagnostics: `../analysis/next_step_analyses.py`
 - Feature matrix and target outputs: `../analysis/features/`
 - Model metrics and selected model artifacts: `../analysis/modeling_outputs/`
 - Per-feature plots and statistical tests: `../analysis/feature_target_plots/`
@@ -41,6 +43,8 @@ Top statistically ranked features from `analysis/modeling_outputs/feature_rankin
 | `token_lG_fraction` | 2.770e-12 | 0.0446 | 0.0009 | 0.8487 | 0.0000 |
 
 The random-forest importance ranking emphasizes positional spread of `*`, repeated dinucleotides, base composition, and RNA-token position/fraction features. The top five random-forest features are `star_position_std`, `repeated_dinucleotide_count`, `base_U_fraction`, `base_G_fraction`, and `base_T_fraction`.
+
+Bootstrap stability analysis from `analysis/modeling_outputs/feature_stability.csv` shows the most stable model-derived features are dominated by motif/composition features rather than the LNA features that dominate univariate tests. The highest-selection-frequency stable features are `repeated_dinucleotide_count` (selection frequency 0.93), `token_rC_fraction` (0.88), `base_C_fraction` (0.87), `token_rG_fraction` (0.86), `purine_fraction` (0.85), `base_G_fraction` (0.84), `base_T_fraction` (0.84), `pyrimidine_fraction` (0.83), and `base_U_fraction` (0.79). This split suggests that LNA burden is a strong marginal signal, while the selected tree model relies more consistently on composition and repeat structure under resampling.
 
 ## Model Summary
 
@@ -78,11 +82,51 @@ Overall out-of-fold metrics from `analysis/modeling_outputs/cv_metrics.csv`:
 
 The current selected model is `hist_gradient_boosting`, chosen by highest out-of-fold average precision among trained model candidates. Its average precision is about 3.4 times the empirical failure prevalence baseline, and its top 5% risk bin has 12.8% failures versus a 3.2% overall failure rate. `lightgbm_balanced`, `xgboost_weighted`, and `balanced_random_forest` are also useful candidate models for triage-oriented workflows because they provide competitive top-bin enrichment and, for LightGBM/XGBoost, higher recall at 25% precision.
 
+## Post-Selection Diagnostics
+
+The selected `hist_gradient_boosting` model was examined with learning curves, bootstrap feature stability, reduced-feature models, error analysis, Needs Review scoring, and risk tiering.
+
+### Learning Curve
+
+Learning-curve analysis trained the selected model on 10%, 20%, 40%, 60%, 80%, and 100% of each training fold while preserving the same 5-fold stratified grouped CV strategy. Average precision increased from 0.1026 at 80% of the training data to 0.1087 at 100%; ROC AUC increased from 0.6168 to 0.6304; and Precision@5% increased from 0.1053 to 0.1278. Performance therefore still changes between 80% and 100% of the available training data, suggesting additional labeled data would theoretically help. Because more labeled failures are not expected, the practical path is to focus on better interpretation, stability, and operational review workflows using the current data.
+
+### Simplified Models
+
+Reduced-feature models using the top 5, 10, and 20 stable features did not match the full selected model. The best reduced model was `hist_gradient_boosting_top_20`, with average precision 0.0738 and ROC AUC 0.6113, about 68% of the full model's average precision. This does not meet the planned 10-15% performance-loss criterion for preferring a simpler deployment model. The full 161-feature `hist_gradient_boosting` model remains the recommended model for risk ranking.
+
+### Risk Tiers
+
+Risk tiering converts continuous out-of-fold predictions into operational review groups:
+
+| Tier | Definition | Rows | Failures | Observed failure rate | Mean predicted risk | Enrichment |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| High Risk | Top 5% highest predicted risk | 132 | 16 | 0.1212 | 0.2506 | 3.73x |
+| Medium Risk | Next 15% highest predicted risk | 397 | 16 | 0.0403 | 0.0536 | 1.24x |
+| Low Risk | Remaining 80% | 2117 | 54 | 0.0255 | 0.0086 | 0.78x |
+
+This supports using the model as a review-prioritization tool: the high-risk tier is enriched for failures, while the low-risk tier is below baseline failure prevalence.
+
+### Error Analysis and Needs Review Samples
+
+At the default 0.5 threshold, the selected model produces 80 false negatives and 11 false positives, reinforcing that the model should not be used as a hard pass/fail classifier. The false-positive report is still useful operationally because high-risk passing sequences often resemble difficult chemistry patterns and define the sequences most likely to be escalated for review.
+
+The 11 `Needs Review` rows were rescored with the selected model and assigned percentile ranks relative to binary-labeled sequences. The highest-risk `Needs Review` examples have predicted risks of 0.0815 and 0.0346, corresponding to the 94.1st and 84.6th risk percentiles, while the remaining examples mostly fall much lower. This provides a small external sanity check: at least some ambiguous rows occupy a high-risk but not extreme-risk region.
+
+### Design Rules and SHAP Status
+
+Candidate design rules in `analysis/modeling_outputs/design_rules.md` remain review guidance rather than hard filters. Moderate-confidence signals include elevated LNA-A/LNA-T burden and longer LNA runs from univariate evidence, repeated dinucleotide structure and base-composition shifts from stability/model evidence, and phosphorothioate positional spread from model-derived stability evidence.
+
+SHAP-specific plots were not generated because the configured conda environment does not include the `shap` package. No package was installed automatically, following the project environment instructions. The current interpretation evidence therefore comes from bootstrap stability, univariate statistics, feature rankings, error analysis, and risk-tier enrichment.
+
 ## Key Findings
 
 - The dataset is highly imbalanced: only 86 of 2,646 binary labeled samples are failures. Metrics that focus on ranking and positive-class discovery are more informative than accuracy.
 - The best current model is `hist_gradient_boosting`, with out-of-fold average precision 0.1087, ROC AUC 0.6304, Brier score 0.0319, and 12.8% failure precision in the top 5% highest-risk samples.
+- Learning-curve results do not show a clear full plateau: AP, ROC AUC, and Precision@5% all improve from 80% to 100% of training data. Since additional labeled failures are not expected, future work should emphasize feature interpretation, stable review rules, and better use of existing signal.
+- The high-risk tier is operationally useful: the top 5% highest-risk sequences show a 12.1% observed failure rate, or 3.73x enrichment over the 3.25% baseline.
+- Reduced-feature models are not yet competitive with the full model. The best top-20-feature HGB model retains about 68% of full-model AP, so the full engineered feature set remains preferred.
 - The strongest single-feature statistical signals are LNA features derived from `+` notation. Failures have higher LNA A/T counts and fractions, and LNA middle-window features are prominent in the univariate rankings.
+- Bootstrap stability highlights a complementary set of robust model-derived features, especially repeated dinucleotide count, RNA-token fractions, base-composition fractions, purine/pyrimidine fractions, and positional spread features.
 - Positional chemistry features add useful signal. LNA position/spread, RNA-token position, modified-token mean position, and positional spread of `*` and modified tokens appear in the statistical or model-importance rankings.
 - Run and motif features matter. LNA run features dominate the univariate ranking, while repeated dinucleotide count remains one of the strongest random-forest importance features.
 - Base-composition features contribute to model decisions, especially U/T-equivalent, C, G, pyrimidine, and RNA-token fractions.
