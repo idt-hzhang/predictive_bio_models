@@ -121,6 +121,12 @@ foreach (var threshold in new[]
         $"{threshold,-8:0.00}{tp,-8}{fp,-8}{fn,-8}{tn,-8}{precision,-8:0.0000}{recall,-8:0.0000}{f1,-8:0.0000}{accuracy,-8:0.0000}");
 }
 
+// Permutation feature importance on the raw input features.
+// For each feature, shuffle that column across the test rows, re-score with the
+// trained model, and measure the drop in ROC-AUC and F1 vs. the baseline.
+Console.WriteLine("\nPermutation feature importance (higher drop = more important):");
+PrintFeatureImportance(mlContext, model, split.TestSet);
+
 mlContext.Model.Save(model, data.Schema, modelPath);
 Console.WriteLine($"Model saved to: {Path.GetFullPath(modelPath)}");
 
@@ -264,3 +270,68 @@ static void PrintParseError(string field) => Console.WriteLine($"  ! Could not p
 static string Describe(FractionCollectionRow r) =>
     $"MaxAbs={r.MaxAbsorbance}, MethodId={r.MethodId}, ProductId={r.ProductId}, "
     + $"Tag={r.IsToBeTagged}, Nmole={r.NanomoleGuarantee}, ShipOD={r.ShipODGuarantee}";
+
+static void PrintFeatureImportance(MLContext mlContext, ITransformer model, IDataView testSet)
+{
+    var rows = mlContext.Data.CreateEnumerable<FractionCollectionRow>(testSet, false).ToList();
+
+    var baseline = ScoreAndEvaluate(mlContext, model, rows);
+    Console.WriteLine($"  Baseline: AUC={baseline.Auc:0.0000}  F1={baseline.F1:0.0000}");
+    Console.WriteLine(
+        $"  {"Feature",-20}{"AUC",-10}{"?AUC",-10}{"F1",-10}{"?F1",-10}");
+
+    var rng = new Random(1);
+    (string Name, Action<FractionCollectionRow, FractionCollectionRow> Swap)[] features =
+    [
+        ("MaxAbsorbance", (a, b) => (a.MaxAbsorbance, b.MaxAbsorbance) = (b.MaxAbsorbance, a.MaxAbsorbance)),
+        ("MethodId", (a, b) => (a.MethodId, b.MethodId) = (b.MethodId, a.MethodId)),
+        ("ProductId", (a, b) => (a.ProductId, b.ProductId) = (b.ProductId, a.ProductId)),
+        ("IsToBeTagged", (a, b) => (a.IsToBeTagged, b.IsToBeTagged) = (b.IsToBeTagged, a.IsToBeTagged)),
+        ("NanomoleGuarantee",
+            (a, b) => (a.NanomoleGuarantee, b.NanomoleGuarantee) = (b.NanomoleGuarantee, a.NanomoleGuarantee)),
+        ("ShipODGuarantee",
+            (a, b) => (a.ShipODGuarantee, b.ShipODGuarantee) = (b.ShipODGuarantee, a.ShipODGuarantee))
+    ];
+
+    var results = new List<(string Name, double Auc, double DAuc, double F1, double DF1)>();
+    foreach (var (name, swap) in features)
+    {
+        var shuffled = rows.Select(Clone).ToList();
+        // Fisher-Yates over the chosen column only.
+        for (var i = shuffled.Count - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            swap(shuffled[i], shuffled[j]);
+        }
+
+        var m = ScoreAndEvaluate(mlContext, model, shuffled);
+        results.Add((name, m.Auc, baseline.Auc - m.Auc, m.F1, baseline.F1 - m.F1));
+    }
+
+    foreach (var r in results.OrderByDescending(r => r.DAuc))
+    {
+        Console.WriteLine(
+            $"  {r.Name,-20}{r.Auc,-10:0.0000}{r.DAuc,-10:+0.0000;-0.0000;0.0000}{r.F1,-10:0.0000}{r.DF1,-10:+0.0000;-0.0000;0.0000}");
+    }
+}
+
+static FractionCollectionRow Clone(FractionCollectionRow r) => new()
+                                                               {
+                                                                   MaxAbsorbance = r.MaxAbsorbance,
+                                                                   MethodId = r.MethodId,
+                                                                   ProductId = r.ProductId,
+                                                                   IsToBeTagged = r.IsToBeTagged,
+                                                                   NanomoleGuarantee = r.NanomoleGuarantee,
+                                                                   ShipODGuarantee = r.ShipODGuarantee,
+                                                                   Label = r.Label
+                                                               };
+
+static (double Auc, double F1) ScoreAndEvaluate(MLContext mlContext,
+    ITransformer model,
+    IEnumerable<FractionCollectionRow> rows)
+{
+    var view = mlContext.Data.LoadFromEnumerable(rows);
+    var scored = model.Transform(view);
+    var metrics = mlContext.BinaryClassification.Evaluate(scored);
+    return (metrics.AreaUnderRocCurve, metrics.F1Score);
+}
