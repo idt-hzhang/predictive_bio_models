@@ -360,4 +360,20 @@ MigrationBackup/
 .ionide/
 
 # Fody - auto-generated XML schema
-FodyWeavers.xsd
+FodyWeavers.xsdOn branch main
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+
+MODELING_PLAN.html
+data/
+data_formatting.py
+environment.yml
+figures/
+generate_kickoff_presentation.py
+profile_data.py
+sgRNA-QC-Analysis-ADI-Data-Repository-Jan-2026-to-Mar-2026.xlsx
+sgRNA_synthesizability/.gitignore
+sgRNA_synthesizability/AGENTS.md
+sgRNA_synthesizability_kickoff.pptx
+todo.md
+sgRNA_synthesizability_modeling_summary.pptx
