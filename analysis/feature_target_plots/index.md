@@ -1,6 +1,6 @@
 # Feature vs Target Plots
 
-Each plot shows target-specific histograms plus box/violin summaries for one feature. The summary table includes Mann-Whitney U, Welch t-test, Kolmogorov-Smirnov, and effect-size statistics.
+Each plot uses `Pass/Fail` on the x-axis and the feature value on the y-axis, with box/violin summaries and jittered points. The summary table includes Mann-Whitney U, Welch t-test, Kolmogorov-Smirnov, and effect-size statistics.
 
 | Feature | Plot | Pass mean | Fail mean | Mean diff | MWU p | KS p | Rank-biserial |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |

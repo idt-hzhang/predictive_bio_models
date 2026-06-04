@@ -16,15 +16,37 @@ The modeling workflow treats `Fail` as the positive class. Because failures are 
 - MainPeak regression modeling: `../analysis/train_mainpeak_regression.py`
 - Reduced-feature MainPeak modeling: `../analysis/mainpeak_reduced_feature_modeling.py`
 - Fail-focused MainPeak training experiment: `../analysis/mainpeak_fail_focused_training.py`
+- Presentation asset summary: `../analysis/generate_presentation_assets.py`
 - Feature matrix and target outputs: `../analysis/features/`
 - Correlation-pruned feature matrix and target outputs: `../analysis/features_correlation_reduced/`
 - Model metrics and selected model artifacts: `../analysis/modeling_outputs/`
+- Presentation-ready summary and asset manifest: `../analysis/modeling_outputs/presentation_summary.md` and `../analysis/modeling_outputs/presentation_asset_manifest.csv`
 - Per-feature plots and statistical tests: `../analysis/feature_target_plots/`
 - Full feature definitions: `.github/feature_list.md`
+- Feature selection recommendation: `.github/feature_selection_recommendation.md`
+
+## Analysis Inventory
+
+| Endpoint or question | Input data | Feature set tested | Models or selectors tested | Main output | Current best result |
+| --- | --- | --- | --- | --- | --- |
+| Source Pass/Fail classification | `data/cleaned_data.csv` | Full 161 sequence-derived numeric features; optional decorated-sequence character n-grams | Prevalence baseline, rule baseline, balanced logistic models, calibrated RBF SVM, HGB, balanced RF, LightGBM, XGBoost, elastic-net with char n-grams | `analysis/modeling_outputs/cv_metrics.csv` | Full-feature `hist_gradient_boosting`: PR-AUC 0.1087, ROC AUC 0.6304, Precision@5% 0.1278 |
+| Correlation-pruned Pass/Fail classification | `data/cleaned_data.csv` | 71 features retained after absolute Pearson correlation pruning at 0.90 | Same main classifier families on full versus reduced matrices | `analysis/modeling_outputs/correlation_reduced_model_comparison.md` | Correlation-pruned `hist_gradient_boosting`: PR-AUC 0.1139, ROC AUC 0.6529, Precision@5% 0.1353 |
+| Formula-derived Pass/Need_Review classification | `data/cleaned_data.need_review.csv` | Full 161 features and 71 correlation-pruned features | Same main classifier families | `analysis/modeling_outputs/need_review_modeling_report.md` | Correlation-pruned `hist_gradient_boosting`: PR-AUC 0.4082, ROC AUC 0.7719, F1 0.3467, Precision@5% 0.4737 |
+| MainPeak regression | `data/cleaned_data.mainpeak.csv` | Full 161 sequence-derived numeric features | Ridge, lasso, elastic net, Bayesian ridge, HGB, gradient boosting, random forest, ExtraTrees | `analysis/modeling_outputs/mainpeak_regression_report.md` | Full-feature `extra_trees`: RMSE 6.0574, R2 0.7005, Pearson r 0.8370 |
+| Reduced-feature MainPeak regression | `data/cleaned_data.mainpeak.csv` | Fold-wise top-40 selectors from 161 features | Correlation-pruned target association, mutual information, ExtraTrees importance selectors crossed with ExtraTrees, HGB, elastic net, mean baseline | `analysis/modeling_outputs/mainpeak_reduced_feature_report.md` | `extra_trees_top_40` + `extra_trees`: RMSE 6.0998, R2 0.6963 |
+| Fail-focused MainPeak regression | `data/cleaned_data.mainpeak.csv` plus binary labels | Fold-wise `extra_trees_top_40` features | Ordinary, Fail-oversampled, and Fail-weighted ExtraTrees training | `analysis/modeling_outputs/mainpeak_fail_focused_training_report.md` | Weighting improves Fail RMSE from 16.3866 to 13.4955, but worsens overall RMSE from 6.0998 to 6.8782 |
+| Narrow cross-endpoint feature panels | Pass/Fail, Need_Review, and MainPeak datasets | Greedy low-redundancy 3-, 5-, and 9-feature shared panels | Same classifier families for binary endpoints; regression model family for MainPeak | `analysis/modeling_outputs/narrow_feature_panel_modeling_report.md` and related 3-/5-feature reports | 9-feature panel: Pass/Fail PR-AUC 0.1078, Need_Review PR-AUC 0.3749, MainPeak RMSE 6.2635 |
 
 ## Feature Summary
 
 The current model matrix has 161 numeric features generated from the decorated `Sequence` field. The parser treats `+A`, `+C`, `+G`, `+U`, and `+T` as LNA nucleotides and normalizes them internally to `lA`, `lC`, `lG`, `lU`, and `lT`. The persisted feature matrix also includes an `id` column from `Ref ID` for linkage back to the raw data, but `id` is not used as a model feature.
+
+Feature experiments have used four levels of feature complexity:
+
+1. Full 161-feature matrix for the broadest representation of sequence length, base composition, modification burden, positional chemistry, motifs, runs, parser completeness, and terminal/window summaries.
+2. 71-feature correlation-pruned matrix for lower redundancy while preserving most feature families; this is the current best Pass/Fail ranking feature set.
+3. Fold-wise top-40 MainPeak selectors fit inside each CV split to avoid selection leakage; ExtraTrees importance was the strongest selector for MainPeak.
+4. Shared 3-, 5-, and 9-feature narrow panels for compact interpretation across Pass/Fail, Pass/Need_Review, and MainPeak.
 
 | Feature family | How it is calculated | Relationship with failure target |
 | --- | --- | --- |
@@ -185,6 +207,35 @@ Reduced-feature MainPeak modeling fit feature selectors inside each grouped CV s
 The most stable features selected by the best reduced-feature selector include sequence-size and positional chemistry features such as `token_length`, `methyl_last_position`, `decorated_length`, `star_last_position`, `base_length`, `star_mean_position`, `rna_mean_position`, `modified_token_last_position`, and `star_position_std`. Full reduced-feature results are in `analysis/modeling_outputs/mainpeak_reduced_feature_report.md`.
 
 A fail-focused training experiment tested whether balancing the small `Fail` class improves MainPeak regression for true failures. Using the same fold-wise `extra_trees_top_40` selector, ordinary training was compared with train-fold `Fail` oversampling and `Fail` sample weighting. Balancing does help the failure tail: the best `Fail`-class model is weighted `extra_trees`, improving `Fail` RMSE from 16.3866 to 13.4955 and `Fail` R2 from 0.0002 to 0.3218. However, this comes at a clear cost: overall RMSE worsens from 6.0998 to 6.8782, overall R2 drops from 0.6963 to 0.6138, and `Pass` RMSE worsens from 5.3894 to 6.5189. Oversampling also improves failures but slightly less than weighting in this experiment. The recommendation is therefore not to use bootstrapping/oversampling as the default production model; use class weighting only if the operating goal explicitly prioritizes lower error on known failures over global MainPeak calibration, and prioritize collecting more real low-MainPeak/failure examples instead. Full results are in `analysis/modeling_outputs/mainpeak_fail_focused_training_report.md`.
+
+### Guidance for Future Agents
+
+Use these defaults unless a new task explicitly changes the endpoint or operating goal:
+
+| Goal | Default choice | Why |
+| --- | --- | --- |
+| Rank source Pass/Fail risk | 71-feature correlation-pruned `hist_gradient_boosting` | Best current Pass/Fail PR-AUC and ROC AUC, with slightly better top-5% enrichment than the full feature set. |
+| Explain compact cross-endpoint signal | Revised 9-feature narrow panel | Best small-panel compromise across Pass/Fail, Need_Review, and MainPeak. |
+| Provide the smallest defensible explanation panel | Revised 3-feature panel | Keeps strong Need_Review and MainPeak signal with only `rna_count_middle`, `modified_token_position_std`, and `token_rC_count`. |
+| Predict continuous purity | Full-feature `extra_trees`, or `extra_trees_top_40` + `extra_trees` for a compact model | Full-feature RMSE is 6.0574; top-40 reduced-feature RMSE is 6.0998 with much lower dimensionality. |
+| Screen formula-derived Need_Review rows | Correlation-pruned `hist_gradient_boosting` | Need_Review is much more learnable than source Fail, with PR-AUC 0.4082 and Precision@5% 0.4737. |
+| Improve known-Fail MainPeak error | Weighted `extra_trees` only as an explicit tradeoff | It improves Fail RMSE but worsens overall and Pass performance. |
+
+Important constraints for follow-up work:
+
+1. Keep grouped cross-validation by decorated `Sequence`; do not select features outside the CV loop for model-selection experiments unless the output is explicitly descriptive.
+2. Treat source `Fail`, formula-derived `Need_Review`, and continuous `MainPeak` as related but non-interchangeable endpoints.
+3. Prefer PR-AUC, Precision@top risk bins, ROC AUC, and class-specific metrics over accuracy for rare-event classification.
+4. Do not use default 0.5 thresholds as production pass/fail decisions without threshold tuning for a specified precision, recall, or review-capacity target.
+5. Do not install optional packages such as SHAP without explicit user approval; current interpretation evidence is based on feature rankings, stability, reduced panels, risk tiers, and endpoint comparisons.
+
+High-value next experiments:
+
+1. Calibrate an operational review threshold for the correlation-pruned Pass/Fail HGB model using a fixed review budget or target precision.
+2. Compare the 71-feature Pass/Fail model and 9-feature narrow panel on prospective or time-split data if new labeled batches become available.
+3. Build a small report that aligns each narrow-panel feature with its direction of association for Pass/Fail, Need_Review, and MainPeak.
+4. Test a two-stage workflow: use the 9-feature panel for interpretable triage and the 71-feature model for final Pass/Fail risk ranking.
+5. Prioritize collecting additional low-MainPeak and true-Fail examples, because the current rare-event tail limits hard-classifier performance more than model family choice.
 
 ### Risk Tiers
 

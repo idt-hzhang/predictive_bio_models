@@ -135,23 +135,11 @@ def plot_feature(feature_name: str, values: pd.Series, target: pd.DataFrame, out
     pass_std = float(np.std(pass_values, ddof=1)) if len(pass_values) > 1 else 0.0
     fail_std = float(np.std(fail_values, ddof=1)) if len(fail_values) > 1 else 0.0
 
-    fig, (distribution_ax, box_ax) = plt.subplots(1, 2, figsize=(11.2, 4.8), gridspec_kw={"width_ratios": [1.3, 1.0]})
+    fig, ax = plt.subplots(figsize=(6.2, 5.0))
     unique_values = plot_data["feature"].nunique(dropna=True)
-    if unique_values <= 12:
-        bins = np.arange(plot_data["feature"].min() - 0.5, plot_data["feature"].max() + 1.5, 1)
-    else:
-        bins = 30
-
-    distribution_ax.hist(pass_values, bins=bins, alpha=0.55, density=True, label="Pass", color="#3973ac")
-    distribution_ax.hist(fail_values, bins=bins, alpha=0.55, density=True, label="Fail", color="#b84a4a")
-    distribution_ax.set_title("Distribution")
-    distribution_ax.set_xlabel(feature_name)
-    distribution_ax.set_ylabel("Density")
-    distribution_ax.legend(frameon=False)
-    distribution_ax.grid(axis="y", alpha=0.22)
 
     if len(pass_values) > 1 and len(fail_values) > 1 and unique_values > 2:
-        violin = box_ax.violinplot(grouped, showmeans=False, showmedians=True, showextrema=False)
+        violin = ax.violinplot(grouped, showmeans=False, showmedians=True, showextrema=False)
         for body, color in zip(violin["bodies"], ["#3973ac", "#b84a4a"]):
             body.set_facecolor(color)
             body.set_edgecolor(color)
@@ -159,13 +147,15 @@ def plot_feature(feature_name: str, values: pd.Series, target: pd.DataFrame, out
         if "cmedians" in violin:
             violin["cmedians"].set_color("#1f2328")
 
-    box_ax.boxplot(grouped, tick_labels=["Pass", "Fail"], showfliers=False, widths=0.38)
-    box_ax.set_title("Box/violin by target")
-    box_ax.set_xlabel("Target label")
-    box_ax.set_ylabel(feature_name)
-    box_ax.grid(axis="y", alpha=0.25)
+    rng = np.random.default_rng(42)
+    ax.boxplot(grouped, tick_labels=["Pass", "Fail"], showfliers=False, widths=0.38)
+    ax.scatter(rng.normal(1, 0.035, len(pass_values)), pass_values, color="#3973ac", alpha=0.16, s=9, edgecolors="none")
+    ax.scatter(rng.normal(2, 0.035, len(fail_values)), fail_values, color="#b84a4a", alpha=0.46, s=18, edgecolors="none")
+    ax.set_title(f"{feature_name} by HPLC QC outcome")
+    ax.set_xlabel("Pass/Fail")
+    ax.set_ylabel(feature_name)
+    ax.grid(axis="y", alpha=0.25)
 
-    fig.suptitle(f"{feature_name} by HPLC QC outcome", y=1.02)
     fig.text(
         0.01,
         0.01,
@@ -176,7 +166,7 @@ def plot_feature(feature_name: str, values: pd.Series, target: pd.DataFrame, out
         va="bottom",
         fontsize=8.5,
     )
-    fig.tight_layout(rect=[0, 0.06, 1, 1])
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
 
     output_path = output_dir / safe_filename(feature_name)
     fig.savefig(output_path, dpi=160)
@@ -203,7 +193,7 @@ def write_index(summary: pd.DataFrame, output_dir: Path) -> None:
     lines = [
         "# Feature vs Target Plots",
         "",
-        "Each plot shows target-specific histograms plus box/violin summaries for one feature. The summary table includes Mann-Whitney U, Welch t-test, Kolmogorov-Smirnov, and effect-size statistics.",
+        "Each plot uses `Pass/Fail` on the x-axis and the feature value on the y-axis, with box/violin summaries and jittered points. The summary table includes Mann-Whitney U, Welch t-test, Kolmogorov-Smirnov, and effect-size statistics.",
         "",
         "| Feature | Plot | Pass mean | Fail mean | Mean diff | MWU p | KS p | Rank-biserial |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",

@@ -1,0 +1,20 @@
+asset_type,path,exists,presentation_use
+figure_index,analysis/feature_target_plots/index.md,True,Engineered feature vs Pass/Fail figures; Pass/Fail is x-axis and feature value is y-axis.
+figure_index,analysis/all_data_qc_feature_boxplots/index.md,True,Raw QC/manufacturing feature plots by Pass/Fail.
+figure,analysis/modeling_outputs/learning_curve.png,True,Learning-curve figure for training-set-size discussion.
+figure,analysis/modeling_outputs/mainpeak_regression_observed_vs_predicted.png,True,Observed versus predicted MainPeak regression figure.
+table,analysis/modeling_outputs/cv_metrics.csv,True,Full-feature Pass/Fail classifier metrics.
+table,analysis/modeling_outputs/correlation_reduced_model_comparison.csv,True,Full versus 71-feature correlation-pruned Pass/Fail comparison.
+table,analysis/modeling_outputs/need_review_model_comparison.csv,True,Full versus correlation-pruned Need_Review comparison.
+table,analysis/modeling_outputs/mainpeak_regression_metrics.csv,True,Full-feature MainPeak regression metrics.
+table,analysis/modeling_outputs/mainpeak_reduced_feature_regression_metrics.csv,True,Top-40 reduced-feature MainPeak metrics.
+table,analysis/modeling_outputs/narrow_feature_panel_selected_features.csv,True,Revised 9-feature compact cross-endpoint panel.
+table,analysis/modeling_outputs/feature_rankings.csv,True,Statistical and model-derived feature ranking table.
+table,analysis/modeling_outputs/risk_tiering.csv,True,Risk tier enrichment table.
+report,analysis/modeling_outputs/evaluation_report.md,True,Main Pass/Fail evaluation report.
+report,analysis/modeling_outputs/need_review_modeling_report.md,True,Need_Review model report.
+report,analysis/modeling_outputs/mainpeak_regression_report.md,True,MainPeak regression and derived classifier report.
+report,analysis/modeling_outputs/mainpeak_reduced_feature_report.md,True,Reduced-feature MainPeak report.
+report,analysis/modeling_outputs/narrow_feature_panel_modeling_report.md,True,9-feature narrow-panel report.
+report,sgRNA_synthesizability/.github/feature_selection_recommendation.md,True,Feature-selection recommendations for next-step decisions.
+report,sgRNA_synthesizability/README.md,True,Project-level narrative summary.
